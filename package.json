@@ -1,6 +1,7 @@
 {
   "name": "pulsesafe",
   "version": "1.0.0",
+  "description": "An end-to-end emergency alert system.",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
@@ -18,8 +19,11 @@
     "expo-media-library": "~16.0.3",
     "expo-sensors": "~13.0.9",
     "expo-status-bar": "~1.12.1",
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
     "react": "18.2.0",
-    "react-native": "0.74.3"
+    "react-native": "0.74.3",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"
