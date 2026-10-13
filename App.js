@@ -6,8 +6,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import CountdownScreen from './CountdownScreen';
 import SettingsScreen from './SettingsScreen';
+import ContactsScreen from './ContactsScreen'; // Preserved Contact Screen
 
-const BACKEND_URL = 'http://192.168.8.70:3000/alert';
+// ⚠️ IMPORTANT: Change this IP to match your current Wi-Fi IPv4 address!
+const BACKEND_URL = 'http://172.25.3.96:3000/alert';
 const DEFAULT_THRESHOLD = 5;
 
 export default function App() {
@@ -15,11 +17,14 @@ export default function App() {
   const [isEmergencyDetected, setIsEmergencyDetected] = useState(false);
   const [accelerometerData, setAccelerometerData] = useState({ x: 0, y: 0, z: 0 });
   const [locationPermission, setLocationPermission] = useState(null);
+  
   const [isSettingsMode, setIsSettingsMode] = useState(false);
+  const [isContactsMode, setIsContactsMode] = useState(false); // Preserved State
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
 
   useEffect(() => {
     (async () => {
+      // 1. Request ONLY location permissions (Removed Camera/Mic)
       const { status: locationStatus } = await Location.requestForegroundPermissionsAsync();
       setLocationPermission(locationStatus === 'granted');
 
@@ -44,6 +49,7 @@ export default function App() {
     })();
   }, []);
 
+  // 2. Monitor Accelerometer
   useEffect(() => {
     if (isProtectionMode && !isEmergencyDetected) {
       const subscription = Accelerometer.addListener(accelerometerData => {
@@ -59,6 +65,7 @@ export default function App() {
     }
   }, [isProtectionMode, isEmergencyDetected]);
 
+  // 3. Evaluate Crash Threshold
   useEffect(() => {
     if (isProtectionMode && !isEmergencyDetected) {
       const { x, y, z } = accelerometerData;
@@ -87,6 +94,7 @@ export default function App() {
     setIsProtectionMode(false);
   };
 
+  // 4. Send Lightweight Telemetry Packet (No Video/Audio)
   const handleTimeout = async () => {
     console.log("Countdown finished. Capturing location and sending alert...");
     
@@ -94,6 +102,7 @@ export default function App() {
       const location = await Location.getCurrentPositionAsync({});
       console.log('Location:', `${location.coords.latitude},${location.coords.longitude}`);
 
+      // Bundle only GPS and Timestamp
       const formData = new FormData();
       formData.append('latitude', location.coords.latitude);
       formData.append('longitude', location.coords.longitude);
@@ -101,6 +110,7 @@ export default function App() {
       
       const response = await axios.post(BACKEND_URL, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 10000, // Reduced timeout since we aren't sending large files
       });
 
       Alert.alert('Alert Sent!', 'Emergency alert has been sent with your location.');
@@ -115,17 +125,25 @@ export default function App() {
     }
   };
 
+  // Screen Routing
   if (isEmergencyDetected) {
     return <CountdownScreen onCancel={handleCancel} onTimeout={handleTimeout} />;
   }
 
+  // Passing only the motion save function to settings
   if (isSettingsMode) {
     return <SettingsScreen onSave={setThreshold} onBack={() => setIsSettingsMode(false)} />;
+  }
+
+  // Routing to Contacts screen
+  if (isContactsMode) {
+    return <ContactsScreen onBack={() => setIsContactsMode(false)} />;
   }
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>PulseSafe</Text>
+      
       <View style={styles.toggleContainer}>
         <Text style={styles.toggleText}>Protection Mode</Text>
         <Switch
@@ -133,6 +151,7 @@ export default function App() {
           value={isProtectionMode}
         />
       </View>
+
       {isProtectionMode && (
         <View style={styles.statusContainer}>
           <Text style={styles.statusText}>Status: Active</Text>
@@ -141,11 +160,16 @@ export default function App() {
           <Text style={styles.statusText}>y: {accelerometerData.y.toFixed(2)}</Text>
           <Text style={styles.statusText}>z: {accelerometerData.z.toFixed(2)}</Text>
           <Text style={styles.statusText}>Force: {Math.sqrt(accelerometerData.x*accelerometerData.x + accelerometerData.y*accelerometerData.y + accelerometerData.z*accelerometerData.z).toFixed(2)}</Text>
-          <Text style={styles.statusText}>Threshold: {threshold.toFixed(2)}</Text>
+          <Text style={styles.statusText}>Motion Threshold: {threshold.toFixed(2)}</Text>
         </View>
       )}
+
+      {/* Navigation Buttons */}
       <View style={styles.settingsButtonContainer}>
         <Button title="Settings" onPress={() => setIsSettingsMode(true)} />
+      </View>
+      <View style={styles.contactsButtonContainer}>
+        <Button title="Emergency Contacts" onPress={() => setIsContactsMode(true)} color="#27ae60" />
       </View>
     </View>
   );
@@ -186,5 +210,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 20,
+  },
+  contactsButtonContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
   },
 });
